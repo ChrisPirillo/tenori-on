@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenori-Online</title>
+
+    <!-- SEO Meta Tags (content abbreviated for brevity) -->
+    <meta name="description" content="Experience Tenori-Online, an interactive web-based music sequencer inspired by the Yamaha Tenori-On. Create and play music with a 16x16 grid, multiple layers, and various synth sounds.">
+    <meta name="keywords" content="tenori-on, music sequencer, web audio, synthesizer, online instrument, musical grid, digital music, interactive music, Yamaha Tenori-On, music creation, online daw, browser music">
+    <meta name="author" content="Chris Pirillo">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://pirillo.com/arcade/tenori-on.html">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Tenori-Online: Interactive Web-Based Music Sequencer">
+    <meta property="og:description" content="Create and play music with this web-based Tenori-On inspired sequencer. Features multiple layers and various synth sounds.">
+    <meta property="og:image" content="https://pirillo.com/arcade/images/tenori-on.png">
+    <meta property="og:url" content="https://pirillo.com/arcade/tenori-on.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Chris Pirillo's Arcade">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Tenori-Online: Interactive Web-Based Music Sequencer">
+    <meta name="twitter:description" content="Create and play music with this web-based Tenori-On inspired sequencer. Features multiple layers and various synth sounds.">
+    <meta name="twitter:image" content="https://pirillo.com/arcade/images/tenori-on.png">
+    <meta name="twitter:site" content="@ChrisPirillo">
+    <meta name="twitter:creator" content="@ChrisPirillo">
+
+    <!-- Performance: Preconnect to critical origins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+    <!-- Stylesheets and Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <!-- LD+JSON Structured Data (content abbreviated) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Tenori-Online",
+      "description": "An interactive web-based music sequencer inspired by the Yamaha Tenori-On.",
+      "applicationCategory": "MusicApplication",
+      "operatingSystem": "All (Web-based)",
+      "url": "https://pirillo.com/arcade/tenori-on.html",
+      "image": "https://pirillo.com/arcade/images/tenori-on.png",
+      "creator": { "@type": "Person", "name": "Chris Pirillo", "url": "https://pirillo.com" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
+      "keywords": "tenori-on, music sequencer, web audio, synthesizer, online instrument, musical grid, digital music, interactive music"
+    }
+    </script>
+
+    <style>
+        :root {
+            --tenori-frame-bg-start: #E0E0E0;
+            --tenori-frame-bg-end: #B0B0B0;
+            --tenori-surface-bg: #C5C5C5;
+            --button-off-bg: #A0A0A0;
+            --button-on-bg: #FFFFFF;
+            --button-on-glow: rgba(255, 255, 255, 0.7);
+            --button-active-glow-color: #FFFFFF;
+            --button-active-strong-shadow: rgba(255, 255, 255, 0.9);
+            --playhead-column-indicator-brightness: 1.1;
+            --text-color: #333;
+            --control-button-bg: #555555;
+            --control-button-hover-bg: #666666;
+            --control-button-text-color: #E0E0E0;
+            --control-border-color: #404040;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        #app-title {
+            font-family: 'Orbitron', sans-serif;
+            color: #E0E0E0;
+            text-shadow: 0 0 5px rgba(255,255,255,0.3), 0 0 10px rgba(100,180,255,0.3);
+        }
+
+        #tenori-on-app-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: clamp(300px, 90vmin, 550px);
+        }
+
+        #tenori-on-frame {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-image: linear-gradient(145deg, var(--tenori-frame-bg-start), var(--tenori-frame-bg-end));
+            border-radius: 30px;
+            padding: clamp(10px, 3vmin, 20px);
+            box-shadow:
+                0 0 5px rgba(255, 255, 255, 0.2),
+                0 10px 20px rgba(0, 0, 0, 0.4),
+                inset 0 0 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #tenori-on-grid-surface {
+            width: 100%;
+            height: 100%;
+            background-color: var(--tenori-surface-bg);
+            border-radius: 15px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            grid-template-rows: repeat(16, 1fr);
+            gap: clamp(1px, 0.6vmin, 3px);
+            padding: clamp(3px, 0.7vmin, 6px);
+            aspect-ratio: 1 / 1;
+            position: relative;
+        }
+
+        .tenori-button {
+            border-radius: 50%;
+            background-color: var(--button-off-bg);
+            cursor: pointer;
+            transition: background-color 0.05s ease-out, box-shadow 0.05s ease-out, filter 0.05s linear;
+            box-shadow:
+                inset 1px 1px 2px rgba(0,0,0,0.3),
+                inset -0.5px -0.5px 1px rgba(255,255,255,0.2),
+                0px 0.5px 0.5px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .tenori-button:hover {
+            filter: brightness(1.2);
+        }
+
+        .tenori-button.on {
+            background-color: var(--button-on-bg);
+            box-shadow:
+                0 0 8px var(--button-on-glow),
+                0 0 15px var(--button-on-glow),
+                inset 1px 1px 2px rgba(255,255,255,0.5),
+                inset -1px -1px 2px rgba(0,0,0,0.1);
+        }
+
+        .tenori-button.in-playhead-column {
+            filter: brightness(var(--playhead-column-indicator-brightness));
+        }
+
+        .tenori-button.on.playhead-active {
+             background-color: var(--button-on-bg);
+             filter: brightness(1);
+             box-shadow:
+                0 0 15px var(--button-active-glow-color),
+                0 0 30px var(--button-active-glow-color),
+                0 0 45px var(--button-active-strong-shadow),
+                inset 1px 1px 3px rgba(255,255,255,0.8),
+                inset -1px -1px 3px rgba(0,0,0,0.1);
+        }
+
+        #controls-panel {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            gap: 6px; /* Handles both row and column spacing effectively */
+            align-items: center; /* Vertically align items within each line */
+            justify-content: center; /* Center items if they wrap */
+            padding: 8px 5px; 
+            border-radius: 10px;
+        }
+
+        #controls-panel > button,
+        #controls-panel > select,
+        .tempo-control-wrapper {
+            height: 36px;
+            box-sizing: border-box;
+            flex-shrink: 0; 
+            /* margin-bottom: 4px; /* REMOVED - Rely on row-gap from 'gap' property */
+        }
+        
+        /* #controls-panel > :last-child { /* REMOVED - No longer needed if margin-bottom is removed from direct children */
+            /* margin-bottom: 0; */
+        /* } */
+
+        @media (min-width: 600px) { 
+             #controls-panel {
+                flex-wrap: nowrap; /* Revert to nowrap on larger screens */
+             }
+             /* No margin-bottom to remove from children if it's not set in the base rule for wrapped view */
+        }
+
+
+        #controls-panel > button,
+        #controls-panel > select {
+            padding: 0 8px; 
+            border-radius: 6px;
+            border: none;
+            font-size: 0.8rem; 
+            color: var(--control-button-text-color);
+            background-color: var(--control-button-bg);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1);
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap; 
+        }
+
+        #controls-panel > button:hover,
+        #controls-panel > select:hover {
+            color: var(--control-button-text-color);
+            background-color: var(--control-button-hover-bg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.05);
+        }
+
+        .tempo-control-wrapper {
+            display: flex;
+            align-items: center;
+            background-color: var(--control-button-bg);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+
+        .tempo-control-wrapper button {
+            background-color: transparent;
+            border: none;
+            padding: 0 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--control-button-text-color);
+            cursor: pointer;
+            height: 100%;
+            transition: background-color 0.2s ease;
+        }
+        .tempo-control-wrapper button:hover {
+            background-color: var(--control-button-hover-bg);
+        }
+        .tempo-control-wrapper button#bpm-down {
+             border-right: 1px solid var(--control-border-color);
+        }
+         .tempo-control-wrapper button#bpm-up {
+             border-left: 1px solid var(--control-border-color);
+        }
+
+        #tempo-input {
+            width: 40px; 
+            text-align: center;
+            font-size: 0.8rem; 
+            color: var(--control-button-text-color);
+            border: none;
+            height: 100%;
+            padding: 0;
+            background-color: transparent;
+            box-shadow: none;
+            -moz-appearance: textfield;
+        }
+        #tempo-input::-webkit-outer-spin-button,
+        #tempo-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        #layer-selector, #instrument-selector {
+            min-width: 80px; 
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+
+        #message-box-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(3px);
+        }
+
+        #message-box {
+            background-color: #f0f0f0;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 350px;
+            border: 1px solid #ccc;
+        }
+
+        #message-box p { margin-bottom: 20px; color: #333; font-size: 1.1rem; }
+        #message-box button {
+            padding: 12px 25px; border-radius: 8px; border: none;
+            background-color: var(--control-button-hover-bg);
+            color: var(--control-button-text-color);
+            cursor: pointer; transition: background-color 0.2s ease, transform 0.1s ease;
+            font-size: 1rem;
+        }
+        #message-box button:hover {
+             background-color: #777777;
+             transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div id="tenori-on-app-container">
+        <h1 id="app-title" class="text-3xl md:text-4xl font-bold text-center mb-3 md:mb-4">Tenori-Online</h1>
+        <div id="tenori-on-frame">
+            <div id="tenori-on-grid-surface">
+                <!-- Grid buttons will be generated here by JavaScript -->
+            </div>
+        </div>
+
+        <div id="controls-panel">
+            <button id="play-stop-button">Play</button>
+            <div class="tempo-control-wrapper">
+                <button id="bpm-down" aria-label="Decrease BPM">-</button>
+                <input type="number" id="tempo-input" min="20" max="170" value="100">
+                <button id="bpm-up" aria-label="Increase BPM">+</button>
+            </div>
+            <select id="layer-selector"></select>
+            <select id="instrument-selector"></select>
+            <button id="clear-layer-button">Clear</button>
+            <button id="save-button">Save</button>
+            <button id="load-button">Load</button>
+        </div>
+    </div>
+
+    <div id="message-box-overlay">
+        <div id="message-box">
+            <p>Notification message here.</p>
+            <button id="message-box-button">OK</button>
+        </div>
+    </div>
+
+    <input type="file" id="load-file-input" accept=".json" style="display: none;">
+
+    <script>
+        // DOM Elements
+        const gridSurface = document.getElementById('tenori-on-grid-surface');
+        const playStopButton = document.getElementById('play-stop-button');
+        const clearLayerButton = document.getElementById('clear-layer-button');
+        const tempoInput = document.getElementById('tempo-input');
+        const bpmDownButton = document.getElementById('bpm-down');
+        const bpmUpButton = document.getElementById('bpm-up');
+        const layerSelector = document.getElementById('layer-selector');
+        const instrumentSelector = document.getElementById('instrument-selector');
+        const saveButton = document.getElementById('save-button');
+        const loadButton = document.getElementById('load-button');
+        const loadFileInput = document.getElementById('load-file-input');
+        const messageBoxOverlay = document.getElementById('message-box-overlay');
+        const messageBoxP = messageBoxOverlay.querySelector('p');
+        const messageBoxButton = document.getElementById('message-box-button');
+
+        // Constants
+        const ROWS = 16;
+        const COLS = 16;
+        const MAX_LAYERS = 4;
+        const MIN_BPM = 20;
+        const MAX_BPM = 170;
+        const COMPOSITION_VERSION = "1.0.0";
+
+        // State Variables
+        let layerStates = [];
+        let layerSynths = [];
+        let layerInstrumentKeys = [];
+        let activeLayer = 0;
+        let visualButtons = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
+        let currentColumn = 0;
+        let isPlaying = false;
+        let audioInitialized = false;
+        let transportEventId = null;
+        let isChangingInstrument = false;
+
+        // --- Synth Definitions (abbreviated for brevity) ---
+        const STACCATO_RELEASE_TIME = 0.05;
+        const SHORT_DECAY_TIME = 0.1;
+        const PERCUSSIVE_RELEASE_SLIGHTLY_LONGER = 0.08;
+        const synthOptions = {
+            "Sine Wave": { type: Tone.Synth, options: { oscillator: { type: "sine" }, envelope: { attack: 0.005, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Square Wave": { type: Tone.Synth, options: { oscillator: { type: "square" }, envelope: { attack: 0.005, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Triangle Wave": { type: Tone.Synth, options: { oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "FM Synth": { type: Tone.FMSynth, options: { harmonicity: 3, modulationIndex: 10, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME }, modulation: { type: "square" }, modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Warm Pad": { type: Tone.Synth, options: { oscillator: { type: "fatsquare", count: 3, spread: 25 }, envelope: { attack: 0.05, decay: 0.2, sustain: 0.4, release: 0.3 } } },
+            "Kick": { type: Tone.MembraneSynth, options: { pitchDecay: 0.03, octaves: 5, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.15, sustain: 0.001, release: STACCATO_RELEASE_TIME } } },
+            "Synth Lead": { type: Tone.Synth, options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 } } },
+            "HiHat Closed": { type: Tone.MetalSynth, options: { frequency: 300, envelope: { attack: 0.001, decay: 0.03, release: 0.02 }, harmonicity: 4.1, modulationIndex: 20, resonance: 1500, octaves: 1.5 } } ,
+            "Pad Synth": { type: Tone.Synth, options: { oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 0.01, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Bell FM": { type: Tone.FMSynth, options: { harmonicity: 1.5, modulationIndex: 12, detune: 0, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.01, release: STACCATO_RELEASE_TIME }, modulation: { type: "triangle" }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Tom Drum": { type: Tone.MembraneSynth, options: { pitchDecay: 0.05, octaves: 4, oscillator: {type: "triangle"}, envelope: { attack: 0.01, decay: 0.15, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "HiHat Open": { type: Tone.MetalSynth, options: { frequency: 400, envelope: { attack: 0.001, decay: 0.1, release: 0.05 }, harmonicity: 5.1, modulationIndex: 32, resonance: 2500, octaves: 1.5 } },
+            "Clave": { type: Tone.Synth, options: { oscillator: {type: "square"}, envelope: {attack: 0.001, decay: 0.03, sustain: 0, release: PERCUSSIVE_RELEASE_SLIGHTLY_LONGER}, volume: -10 } },
+            "Cowbell": { type: Tone.MetalSynth, options: { frequency: 280, envelope: { attack: 0.002, decay: 0.1, release: 0.03 }, harmonicity: 1.2, modulationIndex: 10, resonance: 3000, octaves: 1 } },
+            "Wood Block": { type: Tone.Synth, options: { oscillator: {type: "square"}, envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: PERCUSSIVE_RELEASE_SLIGHTLY_LONGER}, volume: -8 } },
+            "Steel Drum Ping": { type: Tone.MetalSynth, options: { frequency: 440, envelope: { attack: 0.001, decay: 0.2, release: 0.1 }, harmonicity: 2.5, modulationIndex: 20, resonance: 3000, octaves: 1.2 } },
+            "Wobble Bass": { type: Tone.FMSynth, options: { harmonicity: 1.01, modulationIndex: 15, oscillator: {type: "sawtooth"}, envelope: {attack: 0.01, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME}, modulation: {type: "sine"}, modulationEnvelope: {attack: 0.01, decay: 0.05, sustain: 0.01, release: STACCATO_RELEASE_TIME}, portamento: 0.01 } },
+            "Chiptune": { type: Tone.Synth, options: { oscillator: { type: "pulse", width: 0.3 }, envelope: { attack: 0.005, decay: SHORT_DECAY_TIME, sustain: 0.01, release: STACCATO_RELEASE_TIME } } },
+            "Soft Sine Pluck": { type: Tone.Synth, options: { oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.01, release: 0.05 } } },
+            "Glockenspiel Hit": { type: Tone.MetalSynth, options: { frequency: 800, envelope: { attack: 0.001, decay: 0.1, release: 0.05 }, harmonicity: 3.1, modulationIndex: 16, resonance: 4000, octaves: 0.5 } },
+            "Laser": { type: Tone.Synth, options: { oscillator: {type: "sawtooth"}, envelope: {attack: 0.001, decay: 0.05, sustain: 0, release: STACCATO_RELEASE_TIME}, pitchDecay: 0.02, volume: -6 } },
+            "Synth Drum": { type: Tone.MembraneSynth, options: { pitchDecay: 0.01, octaves: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.001, release: STACCATO_RELEASE_TIME } } }
+        };
+
+        // --- Initialization Functions ---
+        function initializeLayers(skipSynthCreation = false) {
+            for (let i = 0; i < MAX_LAYERS; i++) {
+                layerStates[i] = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+                if (layerSynths[i] && !layerSynths[i].disposed) {
+                    layerSynths[i].dispose();
+                }
+                layerSynths[i] = null;
+                if (i === 0) { 
+                    layerInstrumentKeys[i] = "Sine Wave"; 
+                } else {
+                    layerInstrumentKeys[i] = null;
+                }
+                if (!skipSynthCreation && audioInitialized && layerInstrumentKeys[i]) {
+                    createOrUpdateSynthForLayer(i, layerInstrumentKeys[i], true);
+                }
+            }
+        }
+
+        function populateLayerSelector() {
+            layerSelector.innerHTML = '';
+            for (let i = 0; i < MAX_LAYERS; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Layer ${i + 1}`;
+                layerSelector.appendChild(option);
+            }
+            layerSelector.value = activeLayer;
+        }
+
+        function populateInstrumentSelector() {
+            instrumentSelector.innerHTML = '';
+            const sortedInstrumentNames = Object.keys(synthOptions).sort();
+            for (const name of sortedInstrumentNames) {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                instrumentSelector.appendChild(option);
+            }
+            instrumentSelector.value = layerInstrumentKeys[activeLayer] || (sortedInstrumentNames.length > 0 ? sortedInstrumentNames[0] : "");
+        }
+
+        // --- UI Interaction Functions ---
+        function showAppMessage(message, buttonText = "OK", callback = null) {
+            messageBoxP.textContent = message;
+            messageBoxButton.textContent = buttonText;
+            const newBtn = messageBoxButton.cloneNode(true);
+            const oldBtn = document.getElementById('message-box-button');
+            if (oldBtn && oldBtn.parentNode) {
+                oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+            }
+            newBtn.addEventListener('click', () => {
+                messageBoxOverlay.style.display = 'none';
+                if (callback) callback();
+            }, { once: true });
+            messageBoxOverlay.style.display = 'flex';
+        }
+
+        // --- Audio Synthesis Functions ---
+        function createOrUpdateSynthForLayer(layerIndex, instrumentKey, forceRecreate = false) {
+            if (layerIndex < 0 || layerIndex >= MAX_LAYERS) {
+                console.error("Invalid layer index:", layerIndex);
+                return false;
+            }
+            const currentSynthInstance = layerSynths[layerIndex];
+            const currentInstrumentKey = layerInstrumentKeys[layerIndex];
+
+            if (instrumentKey === null) {
+                if (currentSynthInstance && !currentSynthInstance.disposed) {
+                    currentSynthInstance.releaseAll(Tone.now());
+                    currentSynthInstance.dispose();
+                    layerSynths[layerIndex] = null;
+                }
+                layerInstrumentKeys[layerIndex] = null;
+                return true;
+            }
+
+            if (!forceRecreate && currentInstrumentKey === instrumentKey && currentSynthInstance && !currentSynthInstance.disposed) {
+                return true;
+            }
+
+            if (currentSynthInstance && !currentSynthInstance.disposed) {
+                currentSynthInstance.releaseAll(Tone.now());
+                currentSynthInstance.dispose();
+                layerSynths[layerIndex] = null;
+            }
+
+            const definition = synthOptions[instrumentKey];
+            if (definition) {
+                try {
+                    const newSynth = new Tone.PolySynth({
+                        voice: definition.type,
+                        options: definition.options,
+                    }).toDestination();
+                    newSynth.volume.value = -12;
+                    layerSynths[layerIndex] = newSynth;
+                    console.log(`Synth for layer ${layerIndex + 1} created/updated to: ${instrumentKey}`);
+                    return true;
+                } catch (e) {
+                    console.error(`Error creating synth ${instrumentKey} for layer ${layerIndex + 1}:`, e);
+                    showAppMessage(`Error creating sound: ${instrumentKey}.`);
+                    layerSynths[layerIndex] = null;
+                    return false;
+                }
+            } else {
+                console.error(`Instrument definition not found for ${instrumentKey}.`);
+                layerSynths[layerIndex] = null;
+                return false;
+            }
+        }
+
+        async function setupAudio() {
+            if (audioInitialized) return;
+            try {
+                await Tone.start();
+                console.log("AudioContext started.");
+                for (let i = 0; i < MAX_LAYERS; i++) {
+                    if (layerInstrumentKeys[i]) { 
+                        createOrUpdateSynthForLayer(i, layerInstrumentKeys[i], true);
+                    }
+                }
+                audioInitialized = true;
+            } catch (error) {
+                console.error("Error starting Tone.js:", error);
+                showAppMessage("Audio Initialization Failed.");
+            }
+        }
+
+        // --- Grid and Layer Management ---
+        layerSelector.addEventListener('change', (event) => {
+            activeLayer = parseInt(event.target.value);
+            if (layerInstrumentKeys[activeLayer] === null && activeLayer !== 0) {
+                const instrumentKeysList = Object.keys(synthOptions);
+                layerInstrumentKeys[activeLayer] = instrumentKeysList[Math.floor(Math.random() * instrumentKeysList.length)];
+                if (audioInitialized) {
+                    isChangingInstrument = true;
+                    createOrUpdateSynthForLayer(activeLayer, layerInstrumentKeys[activeLayer], true);
+                    Tone.Draw.schedule(() => { isChangingInstrument = false; }, Tone.now() + 0.02);
+                }
+            }
+            populateInstrumentSelector();
+            updateGridForActiveLayer();
+        });
+
+        instrumentSelector.addEventListener('change', async (event) => {
+            if (isChangingInstrument) {
+                event.target.value = layerInstrumentKeys[activeLayer];
+                return;
+            }
+            isChangingInstrument = true;
+            const newInstrumentKey = event.target.value;
+            const layerToChange = activeLayer;
+            layerInstrumentKeys[layerToChange] = newInstrumentKey;
+
+            const performSynthUpdate = () => {
+                if (!createOrUpdateSynthForLayer(layerToChange, newInstrumentKey, true)) {
+                    showAppMessage(`Failed to update instrument to ${newInstrumentKey}.`);
+                }
+                Tone.Draw.schedule(() => { isChangingInstrument = false; }, Tone.now() + 0.02); 
+            };
+
+            const oldSynthInstance = layerSynths[layerToChange]; 
+            if (oldSynthInstance && !oldSynthInstance.disposed && Tone.Transport.state === "started") {
+                try { oldSynthInstance.releaseAll(Tone.now()); } catch (e) { console.warn(`Error on releaseAll: ${e.message}`); }
+                Tone.Transport.scheduleOnce(performSynthUpdate, Tone.now() + 0.015); 
+            } else {
+                performSynthUpdate();
+            }
+        });
+
+        function updateGridForActiveLayer() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (visualButtons[r][c]) {
+                        visualButtons[r][c].classList.toggle('on', layerStates[activeLayer][r][c]);
+                    }
+                }
+            }
+            if (isPlaying) highlightPlayhead(currentColumn);
+        }
+
+        function createVisualGrid() {
+            gridSurface.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const button = document.createElement('div');
+                    button.classList.add('tenori-button');
+                    button.dataset.row = r;
+                    button.dataset.col = c;
+                    button.addEventListener('click', () => toggleButtonState(r, c));
+                    gridSurface.appendChild(button);
+                    visualButtons[r][c] = button;
+                }
+            }
+            updateGridForActiveLayer();
+        }
+        
+        function toggleButtonState(row, col) {
+            const actuallyToggleAndPlay = () => {
+                _performToggle(row, col);
+                if (audioInitialized && !isPlaying) startSequencerFromBeginning();
+            };
+            if (!audioInitialized) {
+                setupAudio().then(() => {
+                    if (audioInitialized) actuallyToggleAndPlay();
+                    else { _performToggle(row, col); showAppMessage("Audio could not be started."); }
+                });
+            } else actuallyToggleAndPlay();
+        }
+        
+        function _performToggle(row, col) {
+            layerStates[activeLayer][row][col] = !layerStates[activeLayer][row][col];
+            visualButtons[row][col].classList.toggle('on', layerStates[activeLayer][row][col]);
+            if (isPlaying && currentColumn === col) {
+                visualButtons[row][col].classList.toggle('playhead-active', layerStates[activeLayer][row][col]);
+            }
+        }
+        
+        clearLayerButton.addEventListener('click', () => {
+            if (!audioInitialized && !isPlaying) {
+                 setupAudio().then(() => { if (audioInitialized) _performClearActiveLayer(); });
+            } else _performClearActiveLayer();
+        });
+        
+        function _performClearActiveLayer() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) layerStates[activeLayer][r][c] = false;
+            }
+            updateGridForActiveLayer();
+            const activeSynth = layerSynths[activeLayer];
+            if (activeSynth && !activeSynth.disposed) {
+                try { activeSynth.releaseAll(Tone.now()); } catch (e) { console.warn(`Could not releaseAll: ${e.message}`); }
+            }
+        }
+
+        // --- Playback Logic (abbreviated) ---
+        function triggerColumn(col, time) {
+            if (isChangingInstrument || !audioInitialized || !isPlaying) return;
+            for (let layerIdx = 0; layerIdx < MAX_LAYERS; layerIdx++) {
+                const synth = layerSynths[layerIdx];
+                if (!layerInstrumentKeys[layerIdx] || !synth || synth.disposed) continue;
+                let notes = [];
+                for (let r = 0; r < ROWS; r++) {
+                    if (layerStates[layerIdx][r][col]) {
+                        const scale = [0, 2, 4, 7, 9], base = 48, n = (ROWS - 1 - r);
+                        notes.push(Tone.Frequency(base + (Math.floor(n / scale.length) * 12) + scale[n % scale.length], "midi").toFrequency());
+                    }
+                }
+                if (notes.length > 0) try { synth.triggerAttackRelease(notes, "16n", time); } catch (e) { console.error(`Error triggering layer ${layerIdx + 1}:`, e); }
+            }
+        }
+        let lastPlayheadColumn = -1;
+        function highlightPlayhead(col) {
+            // Clear previous
+            if (lastPlayheadColumn !== -1) {
+                for (let r = 0; r < ROWS; r++) {
+                    if(visualButtons[r][lastPlayheadColumn]) visualButtons[r][lastPlayheadColumn].classList.remove('in-playhead-column', 'playhead-active');
+                }
+            }
+            // Set current
+            if (col >= 0 && col < COLS) {
+                for (let r = 0; r < ROWS; r++) {
+                    if(visualButtons[r][col]) {
+                        visualButtons[r][col].classList.add('in-playhead-column');
+                        if (layerStates[activeLayer][r][col]) visualButtons[r][col].classList.add('playhead-active');
+                    }
+                }
+            }
+            lastPlayheadColumn = col;
+        }
+        function clearAllPlayheadHighlights() {
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if(visualButtons[r][c]) visualButtons[r][c].classList.remove('in-playhead-column', 'playhead-active');
+            lastPlayheadColumn = -1;
+        }
+        function startSequencerFromBeginning() {
+            if (!audioInitialized) {
+                setupAudio().then(() => { 
+                    if (audioInitialized) _actuallyStartSequencer(); 
+                    else { showAppMessage("Audio failed. Cannot play."); playStopButton.textContent = 'Play'; isPlaying = false; }
+                });
+                return;
+            }
+            _actuallyStartSequencer();
+        }
+        function _actuallyStartSequencer() {
+            if (isPlaying || isChangingInstrument) return;
+            isPlaying = true; playStopButton.textContent = 'Stop';
+            for(let i=0; i < MAX_LAYERS; i++) { // Ensure synths
+                if (layerInstrumentKeys[i] === null && layerStates[i].some(row => row.some(cell => cell))) {
+                    layerInstrumentKeys[i] = Object.keys(synthOptions)[Math.floor(Math.random() * Object.keys(synthOptions).length)];
+                }
+                if (layerInstrumentKeys[i] && (!layerSynths[i] || layerSynths[i].disposed)) {
+                     if (!createOrUpdateSynthForLayer(i, layerInstrumentKeys[i], true)) console.error(`Failed to ensure synth for layer ${i+1}`);
+                }
+            }
+            if (transportEventId !== null) Tone.Transport.clear(transportEventId);
+            transportEventId = null; Tone.Transport.cancel(0); currentColumn = 0; highlightPlayhead(currentColumn);
+            Tone.Draw.schedule(() => {
+                if (!isPlaying || isChangingInstrument) { if (Tone.Transport.state === "started") Tone.Transport.stop(); Tone.Transport.cancel(0); return; }
+                const loopId = Tone.Transport.scheduleRepeat(time => {
+                    if (transportEventId !== loopId || !isPlaying) return;
+                    if (!isChangingInstrument) triggerColumn(currentColumn, time);
+                    Tone.Draw.schedule(() => { if (transportEventId === loopId && isPlaying) highlightPlayhead(currentColumn); }, time);
+                    currentColumn = (currentColumn + 1) % COLS;
+                }, "16n");
+                transportEventId = loopId;
+                if (Tone.Transport.bpm.value !== parseInt(tempoInput.value)) Tone.Transport.bpm.value = parseInt(tempoInput.value);
+                if (Tone.Transport.state !== "started") Tone.Transport.start(Tone.now() + 0.05);
+            }, Tone.now());
+        }
+       function stopSequencerFully() {
+            isPlaying = false; transportEventId = null; Tone.Transport.cancel(0);
+            if (Tone.Transport.state === "started" || Tone.Transport.state === "paused") Tone.Transport.stop();
+            for (let i = 0; i < MAX_LAYERS; i++) if (layerSynths[i] && !layerSynths[i].disposed) try { layerSynths[i].releaseAll(Tone.now()); } catch (e) { console.warn(`Could not releaseAll layer ${i + 1}: ${e.message}.`); }
+            playStopButton.textContent = 'Play'; clearAllPlayheadHighlights();
+        }
+
+        // --- Event Listeners ---
+        playStopButton.addEventListener('click', async () => {
+            if (isChangingInstrument) { showAppMessage("Instrument change in progress..."); return; }
+            if (!audioInitialized) {
+                try { await setupAudio(); if (!audioInitialized) { showAppMessage("Audio could not be started."); return; } } catch (e) { return; }
+            }
+            if (!isPlaying) startSequencerFromBeginning(); else stopSequencerFully();
+        });
+        function updateTempo(newTempo) {
+            newTempo = Math.max(MIN_BPM, Math.min(MAX_BPM, parseInt(newTempo) || MIN_BPM));
+            tempoInput.value = newTempo;
+            if (Tone.Transport && audioInitialized) Tone.Transport.bpm.value = newTempo;
+        }
+        tempoInput.addEventListener('change', () => updateTempo(tempoInput.value));
+        tempoInput.addEventListener('input', () => { // More responsive tempo update
+            const currentVal = parseInt(tempoInput.value);
+            if (!isNaN(currentVal) && Tone.Transport && audioInitialized && currentVal >= MIN_BPM && currentVal <= MAX_BPM) {
+                 Tone.Transport.bpm.value = currentVal;
+            } else if (isNaN(currentVal) && tempoInput.value === "") {
+                // Allow clearing the input, but don't change transport BPM until valid number
+            } else {
+                // If input is invalid (e.g., too high/low temporarily), don't break transport
+            }
+        });
+        bpmDownButton.addEventListener('click', () => updateTempo(parseInt(tempoInput.value) - 1));
+        bpmUpButton.addEventListener('click', () => updateTempo(parseInt(tempoInput.value) + 1));
+
+        // --- Save Composition ---
+        saveButton.addEventListener('click', () => {
+            if (isChangingInstrument) { showAppMessage("Cannot save during instrument change."); return; }
+            const composition = { version: COMPOSITION_VERSION, bpm: parseInt(tempoInput.value), activeLayer: activeLayer, layersData: [] };
+            for (let i = 0; i < MAX_LAYERS; i++) composition.layersData.push({ instrumentKey: layerInstrumentKeys[i], notes: layerStates[i].map(row => [...row]) });
+            try {
+                const blob = new Blob([JSON.stringify(composition, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `tenori-online-comp-${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+                showAppMessage("Composition saved!");
+            } catch (error) { console.error("Error saving:", error); showAppMessage("Failed to save composition."); }
+        });
+
+        // --- Load Composition ---
+        loadButton.addEventListener('click', () => {
+            if (isChangingInstrument) { showAppMessage("Cannot load during instrument change."); return; }
+            loadFileInput.click();
+        });
+        loadFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const comp = JSON.parse(e.target.result);
+                    if (!comp || comp.version !== COMPOSITION_VERSION || typeof comp.bpm !== 'number' || typeof comp.activeLayer !== 'number' || !Array.isArray(comp.layersData) || comp.layersData.length !== MAX_LAYERS) throw new Error("Invalid file format.");
+                    if (isPlaying) stopSequencerFully();
+                    updateTempo(comp.bpm);
+                    initializeLayers(true); // Skip synth creation initially
+                    for (let i = 0; i < MAX_LAYERS; i++) {
+                        const lData = comp.layersData[i];
+                        if (lData && Array.isArray(lData.notes) && lData.notes.length === ROWS && lData.notes.every(r => Array.isArray(r) && r.length === COLS)) {
+                            layerInstrumentKeys[i] = lData.instrumentKey || null;
+                            layerStates[i] = lData.notes.map(r => [...r]);
+                            if (audioInitialized && layerInstrumentKeys[i]) createOrUpdateSynthForLayer(i, layerInstrumentKeys[i], true);
+                            else if (audioInitialized && layerInstrumentKeys[i] === null && layerSynths[i]) createOrUpdateSynthForLayer(i, null, true);
+                        } else console.warn(`Invalid data for layer ${i+1}.`);
+                    }
+                    activeLayer = Math.max(0, Math.min(MAX_LAYERS - 1, comp.activeLayer));
+                    populateLayerSelector(); populateInstrumentSelector(); updateGridForActiveLayer();
+                    showAppMessage("Composition loaded!");
+                } catch (error) { console.error("Error loading:", error); showAppMessage(`Load failed: ${error.message}`); }
+                finally { loadFileInput.value = ''; }
+            };
+            reader.onerror = () => { showAppMessage("Error reading file."); loadFileInput.value = ''; };
+            reader.readAsText(file);
+        });
+
+        // --- Initial Application Setup ---
+        function main() {
+            initializeLayers(); populateLayerSelector(); populateInstrumentSelector(); createVisualGrid();            
+            tempoInput.min = MIN_BPM; tempoInput.max = MAX_BPM; tempoInput.value = 100;
+            if (Tone && Tone.Transport) Tone.Transport.bpm.value = parseInt(tempoInput.value);
+            document.body.addEventListener('click', async () => { if (!audioInitialized && Tone?.context?.state !== 'running') await setupAudio(); }, { once: true });
+        }
+        main();
+        window.addEventListener('resize', () => { /* Placeholder for resize logic */ });
+
+    </script>
+    <!-- Google Analytics GTag (unchanged) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CQ4D3VQ3L"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1CQ4D3VQ3L');
+    </script>
+</body>
+</html>
